@@ -1,0 +1,1 @@
+{"framework":"angular","buildCommand":"npm run build","outputDirectory":"dist/pokemon-champions-manager/browser","rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
