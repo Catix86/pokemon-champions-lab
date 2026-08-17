@@ -1,1 +1,212 @@
-header{display:flex;align-items:center;justify-content:space-between}.account{display:flex;align-items:center;gap:.55rem}.account .email{max-width:180px;overflow:hidden;color:#cbd5e1;font-size:.72rem;text-overflow:ellipsis;white-space:nowrap}.account button{display:grid;place-items:center;width:36px;height:36px;border:1px solid #ffffff1f;border-radius:10px;background:#ffffff0c;color:#fff}.account .material-symbols-rounded,nav>.material-symbols-rounded{font-size:20px}
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.72rem max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  color: #fff;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(16 23 42 / 94%);
+  box-shadow: 0 8px 28px rgb(16 23 42 / 18%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.brand > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ball {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(#ff5065 0 44%, #10172a 44% 57%, #fff 57%);
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 8%);
+}
+
+.account {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.account .email {
+  display: none;
+  overflow: hidden;
+  max-width: 220px;
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  padding: 0;
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 7%);
+}
+
+.account button:hover {
+  background: rgb(255 255 255 / 13%);
+}
+
+.account .material-symbols-rounded {
+  font-size: 20px;
+}
+
+main {
+  width: 100%;
+  max-width: 1240px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 1rem 1rem calc(92px + env(safe-area-inset-bottom));
+}
+
+nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem;
+  min-height: 68px;
+  padding: 0.45rem max(0.45rem, env(safe-area-inset-right)) calc(0.45rem + env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left));
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(16 23 42 / 96%);
+  box-shadow: 0 -12px 36px rgb(16 23 42 / 20%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+nav a {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.3rem 0.2rem;
+  color: #98a6bd;
+  border-radius: 12px;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+nav a > .material-symbols-rounded {
+  font-size: 22px;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+nav a > span:last-child {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+nav a.active {
+  color: #fff;
+  background: rgb(255 255 255 / 9%);
+}
+
+nav a.active > .material-symbols-rounded {
+  color: #a7f3d0;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+nav a.active > span:last-child {
+  color: #a7f3d0;
+  font-weight: 900;
+}
+
+@media (min-width: 560px) {
+  .account .email {
+    display: block;
+  }
+}
+
+@media (min-width: 850px) {
+  header {
+    padding: 0.85rem 2rem;
+  }
+
+  main {
+    padding: 1.5rem 2rem 3rem;
+  }
+
+  nav {
+    position: sticky;
+    top: 74px;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: min(620px, calc(100% - 2rem));
+    min-height: 0;
+    margin: 0.8rem auto 0;
+    padding: 0.45rem;
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 18px;
+    box-shadow: 0 14px 36px rgb(16 23 42 / 18%);
+  }
+
+  nav a {
+    flex-direction: row;
+    gap: 0.4rem;
+    min-height: 42px;
+  }
+
+  nav a > span:last-child {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .brand > span:last-child {
+    max-width: 145px;
+  }
+
+  nav a > .material-symbols-rounded {
+    font-size: 20px;
+  }
+
+  nav a > span:last-child {
+    font-size: 0.61rem;
+  }
+}
