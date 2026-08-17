@@ -1,8 +1,1 @@
-<header><a class="brand" routerLink="/pokedex"><span class="ball"></span><span>Champions Lab</span></a></header>
-<main><router-outlet /></main>
-<nav aria-label="Navigazione principale">
-<a routerLink="/pokedex" routerLinkActive="active">⌕<span>Pokédex</span></a>
-<a routerLink="/team-builder" routerLinkActive="active">◈<span>Team</span></a>
-<a routerLink="/saved-teams" routerLinkActive="active">▣<span>Salvate</span></a>
-<a routerLink="/recruitment" routerLinkActive="active">✦<span>Ingaggia</span></a>
-</nav>
+@if(auth.authenticated()){<header><a class="brand" routerLink="/pokedex"><span class="ball"></span><span>Champions Lab</span></a><div class="account"><span class="email">{{auth.user()?.email}}</span><button type="button" (click)="logout()" title="Esci"><span class="material-symbols-rounded">logout</span></button></div></header><main><router-outlet /></main><nav aria-label="Navigazione principale"><a routerLink="/pokedex" routerLinkActive="active"><span class="material-symbols-rounded">travel_explore</span><span>Pokédex</span></a><a routerLink="/team-builder" routerLinkActive="active"><span class="material-symbols-rounded">strategy</span><span>Team</span></a><a routerLink="/saved-teams" routerLinkActive="active"><span class="material-symbols-rounded">folder_special</span><span>Salvate</span></a><a routerLink="/recruitment" routerLinkActive="active"><span class="material-symbols-rounded">person_add</span><span>Ingaggia</span></a></nav>}@else{<router-outlet />}

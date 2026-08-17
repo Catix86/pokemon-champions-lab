@@ -1,94 +1,29 @@
-import { Injectable } from '@angular/core';
-import { BattleFormat, MoveSet, Pokemon, PokemonType, Team, TeamMember } from './models';
+import { Injectable, inject } from '@angular/core';
+import { BattleFormat, Pokemon, Team, TeamMember } from './models';
+import { ArchetypeEngine } from './team-builder/engine/archetype.engine';
+import { CoverageEngine } from './team-builder/engine/coverage.engine';
+import { ItemClauseSolver } from './team-builder/engine/item-clause.solver';
+import { MovesetEngine } from './team-builder/engine/moveset.engine';
+import { CORE_BONUSES, DOUBLE_META, SINGLE_META } from './team-builder/data/meta.data';
+import { ProfileFactory } from './team-builder/engine/profile.factory';
+import { PokemonEvaluationService } from './evaluation/pokemon-evaluation.service';
+import { CandidateAnalysis, CompetitiveProfile, PublicBattleFormat, TeamArchetype, TeamWarning, WarningGeneratedTeam, toInternalFormat } from './team-builder/team-builder.models';
 
-const MOVES: Record<PokemonType, readonly string[]> = {
-  Normale: ['Protezione', 'Extrarapido'], Fuoco: ['Fuococarica', 'Bruciapelo'], Acqua: ['Idrondata', 'Acquagetto'],
-  Elettro: ['Fulmine', 'Invertivolt'], Erba: ['Energipalla', 'Erbascivolata'], Ghiaccio: ['Geloraggio', 'Gelolancia'],
-  Lotta: ['Zuffa', 'Assorbipugno'], Veleno: ['Fangobomba', 'Velenpuntura'], Terra: ['Terremoto', 'Geoforza'],
-  Volante: ['Tifone', 'Baldeali'], Psico: ['Psichico', 'Psicotaglio'], Coleottero: ['Retromarcia', 'Forbice X'],
-  Roccia: ['Frana', 'Gemmoforza'], Spettro: ['Palla Ombra', 'Furtivombra'], Drago: ['Dragobolide', 'Dragartigli'],
-  Buio: ['Sbigoattacco', 'Privazione'], Acciaio: ['Metaltestata', 'Corsa all’Oro'], Folletto: ['Forza Lunare', 'Magibrillio'],
-};
-
-const ITEMS = ['Avanzi', 'Assault Vest', 'Bendascelta', 'Focalnastro', 'Vulneropolizza', 'Amuleto Puro'] as const;
-
-const CORE_BONUSES: readonly (readonly [string, string, number])[] = [
-  ['pelipper', 'archaludon', 26], ['politoed', 'archaludon', 22], ['whimsicott', 'garchomp', 20],
-  ['incineroar', 'gholdengo', 16], ['incineroar', 'sinistcha', 18], ['kingambit', 'gholdengo', 15],
-  ['farigiraf', 'sneasler', 17], ['ninetales-alola', 'dragonite', 16], ['tyranitar', 'garchomp', 14],
-];
-
-@Injectable({ providedIn: 'root' })
-export class TeamGeneratorService {
-  generateFromBox(box: Pokemon[], format: BattleFormat): Team {
-    const size = format === 'singolo' ? 6 : 6;
-    if (box.length < size) throw new Error(`Servono almeno ${size} Pokémon nel Box.`);
-
-    const members = this.selectBestCombination(box, size, format);
-    return {
-      name: `${this.archetype(members)} · ${new Date().toLocaleDateString('it-IT')}`,
-      format,
-      members: members.map((pokemon, index) => this.member(pokemon, ITEMS[index])),
-      strategy: this.strategy(members, format),
-      createdAt: Date.now(),
-    };
-  }
-
-  private selectBestCombination(box: Pokemon[], size: number, format: BattleFormat): Pokemon[] {
-    const candidates = [...box].sort((a, b) => b.score - a.score).slice(0, 18);
-    let beam: Pokemon[][] = [[]];
-    for (let slot = 0; slot < size; slot += 1) {
-      beam = beam.flatMap((team) => candidates.filter((p) => !team.includes(p)).map((p) => [...team, p]))
-        .sort((a, b) => this.teamScore(b, format) - this.teamScore(a, format)).slice(0, 120);
-    }
-    return beam[0];
-  }
-
-  private teamScore(team: Pokemon[], format: BattleFormat): number {
-    const types = new Set(team.flatMap((p) => p.types));
-    const roles = new Set(team.map((p) => p.role));
-    let score = team.reduce((sum, p) => sum + p.score, 0) + types.size * 4 + roles.size * 7;
-    for (const [first, second, bonus] of CORE_BONUSES) {
-      if (team.some((p) => p.key === first) && team.some((p) => p.key === second)) score += bonus;
-    }
-    if (format === 'doppio') {
-      score += team.filter((p) => p.role.includes('Supporto')).length * 9;
-      score += team.filter((p) => p.role === 'Attaccante veloce').length * 5;
-    } else {
-      score += team.filter((p) => ['Muro difensivo', 'Wallbreaker'].includes(p.role)).length * 8;
-    }
-    const duplicateTypes = team.flatMap((p) => p.types).length - types.size;
-    return score - duplicateTypes * 3;
-  }
-
-  private member(pokemon: Pokemon, item: string): TeamMember {
-    const primary = pokemon.types[0] ?? 'Normale';
-    const secondary = pokemon.types[1] ?? primary;
-    const support = pokemon.role.includes('Supporto');
-    const moves: MoveSet[] = [
-      { name: MOVES[primary][0], type: primary }, { name: MOVES[secondary][1] ?? MOVES[secondary][0], type: secondary },
-      { name: support ? 'Monito' : 'Protezione', type: support ? 'Buio' : 'Normale' },
-      { name: pokemon.score >= 85 ? 'Tera Esplosione' : 'Sostituto', type: 'Normale' },
-    ];
-    return {
-      pokemon, item, moves,
-      nature: pokemon.role === 'Attaccante veloce' ? 'Allegra' : pokemon.role === 'Muro difensivo' ? 'Scaltra' : 'Decisa',
-      evs: pokemon.role === 'Muro difensivo' ? '252 PS / 252 Dif / 4 SpD' : support ? '252 PS / 156 Dif / 100 SpD' : '252 Atk/SpA / 252 Vel / 4 PS',
-    };
-  }
-
-  private archetype(team: Pokemon[]): string {
-    const keys = new Set(team.map((p) => p.key));
-    if ((keys.has('pelipper') || keys.has('politoed')) && keys.has('archaludon')) return 'Rain Balance';
-    if (keys.has('tyranitar') || keys.has('hippowdon')) return 'Sand Balance';
-    if (keys.has('whimsicott')) return 'Tailwind Offense';
-    if (team.filter((p) => p.role.includes('Supporto')).length >= 2) return 'Bulky Balance';
-    return 'Meta Offense';
-  }
-
-  private strategy(team: Pokemon[], format: BattleFormat): string {
-    const names = team.map((p) => p.name).join(', ');
-    const coverage = new Set(team.flatMap((p) => p.types)).size;
-    return `Ho scelto ${names} confrontando punteggio, copertura di ${coverage} tipi, varietà dei ruoli e nuclei ricorrenti nel meta. ${format === 'doppio' ? 'Il piano principale crea controllo del ritmo e pressione a due bersagli, mantenendo almeno un supporto per proteggere gli attaccanti.' : 'Il piano alterna pivot, muro e wallbreaker, conservando il Pokémon più veloce come cleaner nel finale.'} Gli strumenti sono tutti diversi e rispettano la Item Clause.`;
-  }
+interface DraftResult { team: Pokemon[]; archetype: TeamArchetype; anchor: Pokemon; analysis: CandidateAnalysis; }
+@Injectable({providedIn:'root'}) export class TeamGeneratorService {
+ private readonly evaluation=inject(PokemonEvaluationService);private readonly profiles=inject(ProfileFactory);private readonly archetypes=inject(ArchetypeEngine);private readonly coverage=inject(CoverageEngine);private readonly movesets=inject(MovesetEngine);private readonly items=inject(ItemClauseSolver);
+ generateOptimalTeam(box:Pokemon[],format:PublicBattleFormat):WarningGeneratedTeam{return this.generate(box,toInternalFormat(format));}
+ generateFromBox(box:Pokemon[],format:BattleFormat):WarningGeneratedTeam{return this.generate(box,format);}
+ private generate(box:Pokemon[],format:BattleFormat):WarningGeneratedTeam{const size=format==='singolo'?6:4;const valid=[...new Map(box.map(p=>[p.key,p])).values()];if(valid.length<size)throw new Error(`Servono almeno ${size} Pokémon distinti nel Box.`);const anchors=[...valid].sort((a,b)=>this.anchorScore(b,valid,format)-this.anchorScore(a,valid,format)).slice(0,5);const results:DraftResult[]=[];for(const anchor of anchors){for(const archetype of this.archetypes.rank(anchor,valid,format).slice(0,4)){for(const team of this.beam(valid,anchor,archetype,format,size)){const analysis=this.evaluate(team,archetype,format);results.push({team,archetype,anchor,analysis});}}}if(!results.length)throw new Error(this.failureMessage(valid,format));const best=results.sort((a,b)=>b.analysis.total-a.analysis.total)[0];return this.finalize(best,format);}
+ private anchorScore(p:Pokemon,box:Pokemon[],format:BattleFormat):number{const profile=this.profile(p);let score=this.evaluation.evaluateExisting(p).total*.5+Math.max(profile.attack,profile.specialAttack)/5+(profile.megaEligible?8:0);if(format==='doppio'&&profile.moves.some(m=>m.tags.includes('spread')))score+=7;score+=box.filter(x=>CORE_BONUSES.some(([a,b])=>(a===p.key&&b===x.key)||(b===p.key&&a===x.key))).length*8;return score;}
+ private beam(box:Pokemon[],anchor:Pokemon,archetype:TeamArchetype,format:BattleFormat,size:number):Pokemon[][]{let beam:Pokemon[][]=[[anchor]];while(beam[0]?.length<size){beam=beam.flatMap(team=>box.filter(p=>!team.includes(p)).map(p=>[...team,p])).sort((a,b)=>this.partialScore(b,archetype,format)-this.partialScore(a,archetype,format)).slice(0,180);}return beam.slice(0,45);}
+ private partialScore(team:Pokemon[],archetype:TeamArchetype,format:BattleFormat):number{const types=new Set(team.flatMap(p=>p.types));let score=team.reduce((s,p)=>s+this.evaluation.evaluateExisting(p).total,0)+types.size*4+this.archetypes.score(archetype,team);for(const[a,b,bonus]of CORE_BONUSES)if(team.some(p=>p.key===a)&&team.some(p=>p.key===b))score+=bonus;if(format==='doppio')score+=team.filter(p=>this.profile(p).roles.some(r=>['speed-control','fake-out','pivot'].includes(r))).length*8;return score;}
+ private evaluate(team:Pokemon[],archetype:TeamArchetype,format:BattleFormat):CandidateAnalysis{const defensive=this.coverage.defensiveScore(team);const threats=format==='doppio'?DOUBLE_META:SINGLE_META;const availableMoves=team.flatMap(p=>this.profile(p).moves);const coverage=this.coverage.offensiveCoverage(availableMoves,threats);const violations=[...defensive.violations];if(coverage<90)violations.push(`Copertura meta ${coverage.toFixed(0)}%, inferiore al 90%`);if(format==='doppio'){if(!availableMoves.some(m=>m.tags.includes('speed-control')))violations.push('Manca Speed Control');if(!availableMoves.some(m=>m.tags.includes('pivot')))violations.push('Manca Pivoting');if(!availableMoves.some(m=>m.tags.includes('fake-out')))violations.push('Manca Bruciapelo');}const roleScore=team.reduce((s,p)=>s+new Set(this.profile(p).roles).size*5,0);const archetypeScore=this.archetypes.score(archetype,team);const total=defensive.score*.22+coverage*.26+roleScore*.18+archetypeScore*.2+team.reduce((s,p)=>s+this.evaluation.evaluateExisting(p).total,0)/team.length*.14-violations.length*8;return{total,defensive:defensive.score,offensive:coverage,roles:roleScore,archetype:archetypeScore,coverage,violations};}
+ private finalize(draft:DraftResult,format:BattleFormat):WarningGeneratedTeam{const threats=format==='doppio'?DOUBLE_META:SINGLE_META;let protectCount=0;let speed=false,pivot=false,fakeOut=false;const provisional=draft.team.map(p=>{const missing={speed:format==='doppio'&&!speed,pivot:format==='doppio'&&!pivot,fakeOut:format==='doppio'&&!fakeOut};const uncovered=this.coverage.uncovered([],threats);const selected=this.movesets.select(p,format,draft.archetype,uncovered,missing,protectCount);protectCount+=selected.protectUsed?1:0;speed||=selected.moves.some(m=>m.tags.includes('speed-control'));pivot||=selected.moves.some(m=>m.tags.includes('pivot'));fakeOut||=selected.moves.some(m=>m.tags.includes('fake-out'));return{pokemon:p,profile:this.profile(p),moves:selected.moves,isMega:p.key===draft.anchor.key&&this.profile(p).megaEligible};});const assigned=this.items.solve(provisional);const members:TeamMember[]=provisional.map(x=>{const physical=x.profile.attack>=x.profile.specialAttack;const trick=draft.archetype==='trick-room'&&x.profile.speed<=65;return{pokemon:x.pokemon,item:assigned.get(x.pokemon.key)!,nature:trick?(physical?'Audace':'Quieta'):(x.profile.speed>=100?(physical?'Allegra':'Timida'):(physical?'Decisa':'Modesta')),evs:trick?(physical?'252 PS / 252 Atk / 4 Dif · 0 IV Vel':'252 PS / 252 SpA / 4 Dif · 0 IV Vel'):(physical?'252 Atk / 252 Vel / 4 PS':'252 SpA / 252 Vel / 4 PS · 0 IV Atk'),moves:x.moves.map(m=>({name:m.name,type:m.type}))};});const lead=this.lead(members,draft.archetype);const warnings=this.buildWarnings(draft.team,members,draft.analysis,format);const status=warnings.some(w=>w.severity==='warning')?'valid-with-warnings':'optimal';return{id:crypto.randomUUID(),status,warnings,name:`${this.label(draft.archetype)} · ${new Date().toLocaleDateString('it-IT')}`,format,members,createdAt:Date.now(),archetype:draft.archetype,anchorKey:draft.anchor.key,analysis:draft.analysis,lead,strategy:this.strategy(members,lead,draft.archetype,format)};}
+ private lead(members:TeamMember[],archetype:TeamArchetype):[string,string]{const first=members.find(m=>this.profile(m.pokemon).roles.includes(archetype==='trick-room'?'trick-room-setter':'speed-control'))??members.find(m=>this.profile(m.pokemon).roles.includes('fake-out'))??members[0];const second=members.find(m=>m!==first&&this.profile(m.pokemon).roles.includes('fake-out'))??members.find(m=>m!==first)??members[1];return[first.pokemon.name,second.pokemon.name];}
+ private strategy(members:TeamMember[],lead:[string,string],archetype:TeamArchetype,format:BattleFormat):string{return`Lead consigliata: ${lead[0]} + ${lead[1]}. Nei turni 1-3 imposta ${this.label(archetype)}, proteggi il controllo della velocità e crea un ingresso sicuro per la win condition. Anchor: ${members.sort((a,b)=>b.pokemon.score-a.pokemon.score)[0].pokemon.name}. ${format==='doppio'?'Usa Bruciapelo e pivoting per controllare il Turno 1; non sprecare Protezione, limitata ai membri che richiedono posizionamento.':'Mantieni il momentum, indebolisci i muri e conserva il cleaner per il finale.'}`;}
+ private label(a:TeamArchetype):string{return({'tailwind-offense':'Tailwind Offense','trick-room':'Trick Room',rain:'Rain',sun:'Sun',sand:'Sand',balance:'Balance','bulky-offense':'Bulky Offense'} as const)[a];}
+ private profile(pokemon:Pokemon):CompetitiveProfile{return this.profiles.resolve(pokemon).profile;}
+ private buildWarnings(team:Pokemon[],members:TeamMember[],analysis:CandidateAnalysis,format:BattleFormat):TeamWarning[]{const warnings:TeamWarning[]=[];const resolved=team.map(p=>({pokemon:p,resolved:this.profiles.resolve(p)}));for(const entry of resolved){if(entry.resolved.confidence!=='curated')warnings.push({code:entry.resolved.confidence==='limited'?'LIMITED_PROFILE':'GENERATED_PROFILE',severity:entry.resolved.confidence==='limited'?'warning':'info',title:entry.resolved.confidence==='limited'?'Dati competitivi limitati':'Profilo competitivo generato',message:`Il set di ${entry.pokemon.name} e stato dedotto dai dati disponibili.`,affectedPokemonKeys:[entry.pokemon.key],recommendation:'Controlla il set prima delle lotte classificate.'});}if(format==='doppio'){const allMoves=team.flatMap(p=>this.profile(p).moves);if(!allMoves.some(m=>m.tags.includes('fake-out')))warnings.push({code:'NO_FAKE_OUT',severity:'warning',title:'Bruciapelo non disponibile',message:'La squadra e stata generata comunque, ma il controllo del Turno 1 potrebbe essere meno affidabile.',recommendation:'Compensa con Speed Control, Provocazione, priorita o pressione offensiva.'});if(!allMoves.some(m=>m.tags.includes('speed-control')))warnings.push({code:'NO_SPEED_CONTROL',severity:'warning',title:'Speed Control assente',message:'Non sono disponibili Ventoincoda, Distortozona o alternative equivalenti.'});if(!allMoves.some(m=>m.tags.includes('pivot')))warnings.push({code:'NO_PIVOT',severity:'warning',title:'Pivoting assente',message:'La squadra non dispone di Monito, Retromarcia o alternative equivalenti.'});}if(analysis.coverage<90)warnings.push({code:'INSUFFICIENT_META_COVERAGE',severity:'warning',title:'Copertura meta sotto il 90%',message:`Copertura stimata: ${analysis.coverage.toFixed(0)}%. La squadra e comunque la migliore combinazione disponibile.`});for(const violation of analysis.violations.filter(v=>v.startsWith('Troppi membri')))warnings.push({code:'DEFENSIVE_OVERLAP',severity:'warning',title:'Sovrapposizione difensiva',message:violation});if(!team.some(p=>this.profile(p).megaEligible))warnings.push({code:'NO_MEGA',severity:'info',title:'Nessuna Megaevoluzione',message:'Il Box selezionato non offre una Mega idonea; il team resta valido.'});return warnings;}
+ private failureMessage(_box:Pokemon[],_format:BattleFormat):string{return'Non e stato possibile completare tecnicamente la squadra.';}
 }
